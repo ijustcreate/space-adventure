@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="A living ant-colony simulation. Shape the environment, then watch the colony decide how to survive."
+    />
+    <meta name="theme-color" content="#17100d" />
+    <title>Empire of Ants — Living Prototype</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2317100d'/%3E%3Cg fill='%23f2b84b' stroke='%23f2b84b' stroke-width='4' stroke-linecap='round'%3E%3Cellipse cx='21' cy='32' rx='8' ry='10'/%3E%3Ccircle cx='35' cy='32' r='7'/%3E%3Cellipse cx='48' cy='32' rx='7' ry='9'/%3E%3Cpath d='M29 25 23 16M29 39l-6 9M40 25l6-9M40 39l6 9' fill='none'/%3E%3C/g%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand" aria-label="Empire of Ants">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span>
+            <strong>EMPIRE <em>OF</em> ANTS</strong>
+            <small>Little black ant field colony · alpha 0.2</small>
+          </span>
+        </div>
+
+        <div class="time-readout" aria-live="polite">
+          <span class="eyebrow">FIELD TIME</span>
+          <strong id="dayReadout">DAY 01 · 06:00</strong>
+        </div>
+
+        <nav class="sim-controls" aria-label="Simulation speed">
+          <button class="icon-button" id="pauseButton" aria-label="Pause simulation" title="Pause / resume (Space)">
+            <span id="pauseIcon">Ⅱ</span>
+          </button>
+          <div class="speed-segment" role="group" aria-label="Time speed">
+            <button data-speed="1" class="is-active">1×</button>
+            <button data-speed="2">2×</button>
+            <button data-speed="4">4×</button>
+          </div>
+          <button class="icon-button" id="helpButton" aria-label="Open field guide" title="Field guide (?)">?</button>
+        </nav>
+      </header>
+
+      <main class="workspace">
+        <aside class="tool-rail" aria-label="Colony tools">
+          <span class="rail-label">TOOLS</span>
+          <button class="tool-button is-active" data-tool="inspect" aria-pressed="true">
+            <span class="tool-icon inspect-icon" aria-hidden="true"></span>
+            <span>Inspect</span><kbd>1</kbd>
+          </button>
+          <button class="tool-button" data-tool="dig" aria-pressed="false">
+            <span class="tool-icon dig-icon" aria-hidden="true"></span>
+            <span>Excavate</span><kbd>2</kbd>
+          </button>
+          <button class="tool-button" data-tool="food" aria-pressed="false">
+            <span class="tool-icon food-icon" aria-hidden="true"></span>
+            <span>Food</span><kbd>3</kbd>
+          </button>
+          <button class="tool-button" data-tool="water" aria-pressed="false">
+            <span class="tool-icon water-icon" aria-hidden="true"></span>
+            <span>Moisten</span><kbd>4</kbd>
+          </button>
+          <div class="rail-spacer"></div>
+          <button class="tool-button compact" id="overlayButton" aria-pressed="false">
+            <span class="tool-icon trail-icon" aria-hidden="true"></span>
+            <span>Trails</span><kbd>P</kbd>
+          </button>
+        </aside>
+
+        <section class="world-card" aria-label="Formicarium observation window">
+          <div class="world-heading">
+            <div>
+              <span class="live-dot" aria-hidden="true"></span>
+              <span id="modeLabel">OBSERVATION MODE</span>
+            </div>
+            <div class="seed-label">COLONY <span id="seedReadout">M-000000</span></div>
+          </div>
+
+          <div class="canvas-wrap" id="canvasWrap">
+            <canvas
+              id="worldCanvas"
+              width="1200"
+              height="720"
+              tabindex="0"
+              aria-label="Interactive side view of an ant formicarium. Select a tool, then click or drag in the habitat."
+            ></canvas>
+            <div class="glass-glare" aria-hidden="true"></div>
+            <div class="coach-card" id="coachCard">
+              <span class="coach-index" id="coachIndex">01</span>
+              <div>
+                <strong id="coachTitle">The colony is alive.</strong>
+                <p id="coachText">Place food above ground or mark soil below for excavation. The ants choose the rest.</p>
+              </div>
+              <button id="dismissCoach" aria-label="Dismiss guidance">×</button>
+            </div>
+            <div class="cursor-label" id="cursorLabel" aria-hidden="true"></div>
+          </div>
+
+          <div class="world-footer">
+            <div class="legend" aria-label="Simulation legend">
+              <span><i class="dot worker"></i>worker</span>
+              <span><i class="dot carrier"></i>carrying</span>
+              <span><i class="dot brood"></i>brood</span>
+              <span><i class="dot target"></i>dig target</span>
+            </div>
+            <span id="autosaveLabel">AUTOSAVE READY</span>
+          </div>
+        </section>
+
+        <aside class="intel-panel" aria-label="Colony intelligence panel">
+          <section class="panel-section colony-summary">
+            <div class="section-title">
+              <span>COLONY PULSE</span>
+              <span class="status-chip" id="statusChip">STABLE</span>
+            </div>
+            <div class="hero-stat">
+              <strong id="populationValue">12</strong>
+              <span>WORKERS</span>
+              <small id="populationDelta">+11 brood developing</small>
+            </div>
+            <div class="resource-grid">
+              <div class="resource">
+                <span>CARBS</span><strong id="carbsValue">24.0</strong>
+                <div class="meter"><i id="carbsMeter"></i></div>
+              </div>
+              <div class="resource">
+                <span>PROTEIN</span><strong id="proteinValue">18.0</strong>
+                <div class="meter protein"><i id="proteinMeter"></i></div>
+              </div>
+              <div class="resource">
+                <span>HUMIDITY</span><strong id="humidityValue">64%</strong>
+                <div class="meter humidity"><i id="humidityMeter"></i></div>
+              </div>
+              <div class="resource">
+                <span>STABILITY</span><strong id="stabilityValue">96%</strong>
+                <div class="meter stability"><i id="stabilityMeter"></i></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel-section brood-section">
+            <div class="section-title"><span>BROOD CHAMBER</span><span id="broodTotal">11</span></div>
+            <div class="brood-grid">
+              <div><span class="brood-shape egg"></span><strong id="eggValue">5</strong><small>EGGS</small></div>
+              <div><span class="brood-shape larva"></span><strong id="larvaValue">4</strong><small>LARVAE</small></div>
+              <div><span class="brood-shape pupa"></span><strong id="pupaValue">2</strong><small>PUPAE</small></div>
+            </div>
+          </section>
+
+          <section class="panel-section assignment-section">
+            <div class="section-title"><span>LIVE ASSIGNMENTS</span><span id="activeCount">12 ACTIVE</span></div>
+            <div class="assignment-list">
+              <div><span>Foraging</span><div><i id="forageBar"></i></div><b id="forageCount">0</b></div>
+              <div><span>Excavating</span><div><i id="digBar"></i></div><b id="digCount">0</b></div>
+              <div><span>Brood care</span><div><i id="nurseBar"></i></div><b id="nurseCount">0</b></div>
+              <div><span>Maintenance</span><div><i id="maintainBar"></i></div><b id="maintainCount">0</b></div>
+            </div>
+          </section>
+
+          <section class="panel-section objective-section">
+            <div class="section-title"><span>FIELD OBJECTIVES</span><span id="objectiveCount">0 / 3</span></div>
+            <ol id="objectiveList">
+              <li data-objective="food"><i></i><span>Return 10 food units<small id="foodProgress">0 / 10 gathered</small></span></li>
+              <li data-objective="dig"><i></i><span>Excavate 30 cells<small id="digProgress">0 / 30 opened</small></span></li>
+              <li data-objective="worker"><i></i><span>Raise a new worker<small id="workerProgress">Brood is developing</small></span></li>
+            </ol>
+          </section>
+
+          <section class="panel-section specimen-section" id="specimenSection">
+            <div class="section-title"><span>SPECIMEN NOTE</span><span id="specimenTag">QUEEN</span></div>
+            <strong id="specimenTitle">Foundress M-01</strong>
+            <p id="specimenText">Fed, sheltered, and gloriously unconcerned with middle management.</p>
+          </section>
+
+          <div class="panel-actions">
+            <button id="saveButton">SAVE COLONY</button>
+            <button id="resetButton" class="quiet">NEW SEED</button>
+          </div>
+        </aside>
+      </main>
+
+      <footer class="event-strip" aria-live="polite">
+        <span>FIELD LOG</span>
+        <div id="eventLog">06:00 — Observation began. Twelve workers are active.</div>
+        <button id="muteButton" aria-pressed="false" title="Toggle ambient sound">SOUND OFF</button>
+      </footer>
+    </div>
+
+    <dialog id="helpDialog" class="field-guide">
+      <form method="dialog">
+        <button class="dialog-close" aria-label="Close field guide">×</button>
+        <span class="eyebrow">FIELD GUIDE / 01</span>
+        <h1>You influence conditions.<br />The colony makes decisions.</h1>
+        <div class="guide-grid">
+          <article><b>1</b><h2>Watch</h2><p>Inspect ants and chambers to see what the colony is prioritizing.</p></article>
+          <article><b>2</b><h2>Shape</h2><p>Mark soil to excavate. Workers connect the route instead of teleporting through geology.</p></article>
+          <article><b>3</b><h2>Sustain</h2><p>Place carbohydrate or protein sources above ground and keep the brood chamber moist.</p></article>
+        </div>
+        <p class="guide-note">Field time is compressed. Reloading resumes your last autosave; “New seed” starts a fresh deterministic colony.</p>
+        <button class="primary-dialog-button">RETURN TO THE GLASS</button>
+      </form>
+    </dialog>
+
+    <dialog id="resetDialog" class="confirm-dialog">
+      <form method="dialog">
+        <span class="eyebrow">START A NEW COLONY?</span>
+        <h1>The current autosave will be replaced.</h1>
+        <p>Nothing personal. Nature has never had a particularly sentimental save system.</p>
+        <div>
+          <button value="cancel" class="quiet-dialog-button">KEEP THIS COLONY</button>
+          <button value="confirm" id="confirmReset" class="primary-dialog-button">GENERATE NEW SEED</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="game.js"></script>
+  </body>
+</html>
